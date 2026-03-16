@@ -41,6 +41,6 @@ examples/
 # The root .npmignore might not be used if I publish from packages/core.
 # But let's creating one for root just in case.
 
-
+yarn.lock
 package-lock.json
 README_CI.md
