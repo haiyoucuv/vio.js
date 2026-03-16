@@ -1,0 +1,45 @@
+# General
+node_modules/
+npm-debug.log
+yarn-error.log
+.DS_Store
+Thumbs.db
+
+# Source files (we only want to publish build artifacts usually)
+# However, for TS libraries, sometimes src is useful for debugging.
+# But standard practice is to exclude src if using declarations.
+# Let's keep src if user wants source maps to work perfectly, or exclude if they want smaller package.
+# Given the user wants to publish as npm package, we publish dist/ and package.json/README.
+src/
+tsconfig.json
+tsup.config.ts
+
+# Test files
+test/
+tests/
+spec/
+__tests__/
+*.test.ts
+*.spec.ts
+scripts/
+examples/
+
+# IDE settings
+.vscode
+.idea
+
+# Build artifacts are INCLUDED by default in npm, but gitignored.
+# We must NOT ignore dist/ here if we want to publish it, UNLESS 'files' is set in package.json.
+# It is best practice to use 'files' in package.json.
+# If we don't use 'files', we must ensure dist/ is NOT in .npmignore.
+# But usually .npmignore inherits from .gitignore if .npmignore is missing.
+# If .npmignore exists, it overrides .gitignore.
+# So we ignore src/ and other dev files.
+
+# Specific to this monorepo structure
+# If I am publishing @u-backend/core, I only want its contents.
+# The root .npmignore might not be used if I publish from packages/core.
+# But let's creating one for root just in case.
+
+
+package-lock.json

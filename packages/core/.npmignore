@@ -1,0 +1,7 @@
+# Inherits from root but specific to package
+node_modules/
+src/
+tsconfig.json
+tsup.config.ts
+*.tsbuildinfo
+.DS_Store

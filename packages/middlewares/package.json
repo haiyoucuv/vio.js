@@ -1,0 +1,23 @@
+{
+  "name": "viojs-middlewares",
+  "version": "1.0.0",
+  "description": "Official middlewares for @vio/core framework",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "compile": "tsc --noEmit",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  },
+  "peerDependencies": {
+    "viojs-core": "*"
+  }
+}

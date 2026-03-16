@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vio Framework Test Page</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.5; max-width: 800px; margin: 0 auto; padding: 2rem; background: #f4f4f9; }
+        h1 { color: #333; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+        button { background: #007bff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #eee; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        .error { color: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>Vio Framework Test</h1>
+    
+    <div class="card">
+        <h2>GET /users/:id</h2>
+        <p>Test parameter extraction and cookie handling.</p>
+        <input type="number" id="userId" value="123" style="width: 60px;">
+        <button onclick="getUser()">Get User</button>
+        <pre id="userResult">Click "Get User" to see result...</pre>
+    </div>
+
+    <div class="card">
+        <h2>POST /users</h2>
+        <p>Test DTO validation and body parsing.</p>
+        <div>
+            <input type="text" id="username" placeholder="Username">
+            <input type="number" id="age" placeholder="Age">
+            <button onclick="createUser()">Create User</button>
+        </div>
+        <pre id="createResult">Click "Create User" to see result...</pre>
+    </div>
+
+    <script>
+        async function getUser() {
+            const id = document.getElementById('userId').value;
+            const res = await fetch(`/users/${id}?role=admin`);
+            const data = await res.json();
+            document.getElementById('userResult').textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function createUser() {
+            const username = document.getElementById('username').value;
+            const age = parseInt(document.getElementById('age').value);
+            
+            const res = await fetch('/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, age })
+            });
+            const data = await res.json();
+            document.getElementById('createResult').textContent = JSON.stringify(data, null, 2);
+            if (!res.ok) document.getElementById('createResult').classList.add('error');
+            else document.getElementById('createResult').classList.remove('error');
+        }
+    </script>
+</body>
+</html>
