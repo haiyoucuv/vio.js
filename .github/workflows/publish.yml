@@ -11,6 +11,8 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -20,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'yarn'
 
       - name: Install Dependencies
@@ -33,7 +35,6 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          # This expects you to have scripts "ci:version" and "ci:publish" in package.json
           version: yarn ci:version
           publish: yarn ci:publish
           title: "chore: release version packages"
