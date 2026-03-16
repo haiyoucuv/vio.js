@@ -1,7 +1,13 @@
 {
   "name": "viojs-core",
   "version": "1.0.0",
+  "author": "haiyoucuv",
   "description": "Core functionality for vio framework",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haiyoucuv/vio.js",
+    "directory": "packages/core"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [

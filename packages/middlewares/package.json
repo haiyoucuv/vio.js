@@ -1,7 +1,13 @@
 {
   "name": "viojs-middlewares",
   "version": "1.0.0",
+  "author": "haiyoucuv",
   "description": "Official middlewares for @vio/core framework",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/haiyoucuv/vio.js",
+    "directory": "packages/middlewares"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
