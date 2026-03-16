@@ -136,7 +136,7 @@ test-server.js
 
 # Lock files
 package-lock.json
-yarn.lock
+# yarn.lock (Do not ignore for CI)
 dist/
 .turbo/
 README_CI.md
