@@ -1,60 +1,49 @@
 export type Next = () => Promise<void>;
 export type Middleware<TContext extends BaseContext = BaseContext> = (ctx: TContext, next: Next) => Promise<void>;
 
-import { HttpRequest, HttpResponse } from 'uWebSockets.js';
+import { HttpResponse } from 'uWebSockets.js';
 
 export class BaseContext {
-    req: HttpRequest;
     res: HttpResponse;
     aborted: boolean = false;
     responded: boolean = false; // Tracks if response has been sent to uWebSockets
-        
+
     // Request properties
     method: string;
     url: string;
     query: string;
     headers: Record<string, string>;
-    params: Record<string, string>;
-    
+    params: Record<string, string> = {};
+
     // Response properties
     body: any;
     status: number = 200;
     responseHeaders: Record<string, string | string[]> = {};
-    
+
     // File streaming properties
     _filePath?: string;
 
     private bodyPromise: Promise<Buffer>;
 
-    constructor(res: HttpResponse, req: HttpRequest) {
+    constructor(res: HttpResponse, reqData: { method: string, url: string, query: string, headers: Record<string, string> }) {
         this.res = res;
-        this.req = req;
-        
-        this.method = req.getMethod().toUpperCase();
-        this.url = req.getUrl();
-        
-        // query params
-        this.query = req.getQuery();
-        
-        this.headers = {};
-        req.forEach((k, v) => {
-            this.headers[k] = v;
-        });
-        
-        this.params = {};
+        this.method = reqData.method;
+        this.url = reqData.url;
+        this.query = reqData.query;
+        this.headers = reqData.headers;
 
         // Important: Handle abort
         res.onAborted(() => {
             this.aborted = true;
         });
 
-        // Check if we expect a body
+        // Check if we expect a body based on headers
         const contentLength = this.headers['content-length'];
         const transferEncoding = this.headers['transfer-encoding'];
         const hasBody = (contentLength && parseInt(contentLength) > 0) || (transferEncoding && transferEncoding.includes('chunked'));
 
         if (hasBody) {
-            this.bodyPromise = new Promise((resolve, reject) => {
+            this.bodyPromise = new Promise((resolve) => {
                 let buffer: Buffer;
                 res.onData((chunk, isLast) => {
                     const chunkBuffer = Buffer.from(chunk);
@@ -68,7 +57,7 @@ export class BaseContext {
                         if (buffer) {
                             buffer = Buffer.concat([buffer, chunkBuffer]);
                         } else {
-                            buffer = Buffer.concat([chunkBuffer]);
+                            buffer = chunkBuffer;
                         }
                     }
                 });

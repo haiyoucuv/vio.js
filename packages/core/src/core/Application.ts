@@ -1,9 +1,8 @@
-import { App, TemplatedApp, us_listen_socket } from 'uWebSockets.js';
+import { App, TemplatedApp, us_listen_socket, HttpRequest, HttpResponse } from 'uWebSockets.js';
 import { BaseContext, Middleware, Next } from './Context';
 import { Router } from './Router';
 import { container } from './Container';
 import * as fs from 'fs';
-import * as path from 'path';
 import * as mime from 'mime-types';
 
 export class Application {
@@ -34,59 +33,64 @@ export class Application {
         this.app.ws(pattern, behavior);
     }
 
-    // Register router routes
+    registerNativeRoute(method: string, pattern: string, handler: (res: HttpResponse, req: HttpRequest) => void) {
+        const m = method.toLowerCase();
+        const app = this.app as any;
+        const targetMethod = m === 'delete' ? 'del' : m;
+        if (typeof app[targetMethod] === 'function') {
+            app[targetMethod](pattern, handler);
+        }
+    }
+
+    // Register routes through the router
     registerRoutes(controllers: any[]) {
-        console.error("Application.registerRoutes called with", controllers.length, "controllers");
         this.router.register(controllers);
-        this.use(this.router.middleware());
+    }
+
+    async handleRequest(res: HttpResponse, reqData: any, params: Record<string, string> = {}, action?: Middleware) {
+        let contextAborted = false;
+        res.onAborted(() => { contextAborted = true; });
+
+        try {
+            const ctx = new BaseContext(res, reqData);
+            ctx.params = params;
+
+            // Chain: Global Middlewares -> Route Action (Route Middlewares + Controller Method)
+            const composed = this.compose([...this.middlewares, action].filter(Boolean) as Middleware[]);
+            await composed(ctx);
+
+            if (!contextAborted && !ctx.responded) {
+                this.sendResponse(ctx, contextAborted);
+            }
+        } catch (err) {
+            console.error('Request error:', err);
+            if (!contextAborted) {
+                res.cork(() => {
+                    res.writeStatus('500 Internal Server Error').end('Internal Error');
+                });
+            }
+        }
+    }
+
+    extractRequestData(req: HttpRequest) {
+        const headers: Record<string, string> = {};
+        req.forEach((k, v) => { headers[k] = v; });
+        return {
+            method: req.getMethod().toUpperCase(),
+            url: req.getUrl(),
+            query: req.getQuery(),
+            headers
+        };
     }
 
     async listen(port: number, cb?: (token: us_listen_socket) => void) {
-        this.app.any('/*', async (res, req) => {
-            const isUpgrade = req.getHeader('upgrade') === 'websocket';
-            if (isUpgrade) {
+        this.app.any('/*', (res, req) => {
+            if (req.getHeader('upgrade') === 'websocket') {
                 res.setYield(true);
                 return;
             }
-
-            console.error("DEBUG ENTERED HANDLER");
-            const url = req.getUrl();
-            console.error("URL:", url);
-            let contextAborted = false;
-
-            try {
-                // Create context
-                const ctx = new BaseContext(res, req);
-                console.log(`Incoming request: ${ctx.method} ${ctx.url}`);
-
-                // Keep track of abort safely beyond context setup since we are going async heavily
-                res.onAborted(() => {
-                    ctx.aborted = true;
-                    contextAborted = true;
-                });
-
-                // Execute middleware chain
-                try {
-                    if (contextAborted) return;
-
-                    const composed = this.compose(this.middlewares);
-                    await composed(ctx);
-
-                    if (!contextAborted && !ctx.responded) {
-                        this.sendResponse(ctx, contextAborted);
-                    }
-                } catch (err) {
-                    console.error('Middleware error:', err);
-                    if (!contextAborted) {
-                        res.writeStatus('500 Internal Server Error').end('Internal Server Error');
-                    }
-                }
-            } catch (err) {
-                console.error('Context creation error:', err);
-                if (!contextAborted) {
-                     res.writeStatus('500 Internal Server Error').end('Context Error');
-                }
-            }
+            const reqData = this.extractRequestData(req);
+            this.handleRequest(res, reqData);
         });
 
         this.app.listen(port, (token) => {
@@ -115,25 +119,21 @@ export class Application {
             404: '404 Not Found',
             500: '500 Internal Server Error'
         };
-        const statusText = statusMap[status] || `${status} Status`;
-
-        res.writeStatus(statusText);
+        res.writeStatus(statusMap[status] || `${status} Status`);
         for (const [key, value] of Object.entries(responseHeaders)) {
-            if (Array.isArray(value)) {
-                value.forEach(v => res.writeHeader(key, v));
-            } else {
-                res.writeHeader(key, value);
-            }
+            if (Array.isArray(value)) value.forEach(v => res.writeHeader(key, v));
+            else res.writeHeader(key, value);
         }
     }
 
     private sendResponse(ctx: BaseContext, contextAborted: boolean) {
-        if (contextAborted) return;
+        if (contextAborted || ctx.aborted) return;
 
         const { res, body, _filePath } = ctx;
 
         // --- BRANCH A: FILE STREAMING ---
         if (_filePath) {
+            // ... (keep file streaming logic)
             fs.stat(_filePath, (err, stats) => {
                 if (err || !stats.isFile() || contextAborted || ctx.aborted) {
                     if (!contextAborted && !ctx.aborted) {
@@ -160,49 +160,29 @@ export class Application {
 
                 let readStream = fs.createReadStream(_filePath);
 
-                readStream.on('data', (chunk: string | Buffer) => {
+                readStream.on('data', (chunk) => {
                     if (typeof chunk === 'string') {
                         chunk = Buffer.from(chunk);
                     }
                     // Try to send chunk via uWebSockets
                     const chunkArrayBuffer = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength) as ArrayBuffer;
 
-                    let ok = false;
-                    let done = false;
-
+                    let ok = false, done = false;
                     res.cork(() => {
                         const result = res.tryEnd(chunkArrayBuffer, totalSize);
                         ok = result[0];
                         done = result[1];
                     });
-
-                    if (done) {
-                        // Current chunk ended successfully and stream completed (if it was the last piece)
-                    } else if (ok) {
-                        // Chunk successfully buffered to C++ space
-                    } else {
-                        // **Backpressure activated!**
-                        // C++ buffer is full (Client network is slow) -> Pause reading from Disk!
+                    if (!ok && !done) {
                         readStream.pause();
-
-                        // Wait for C++ buffer to drain
-                        res.onWritable((offset) => {
-                            // C++ buffer drained, we can resume reading from Disk
-                            readStream.resume();
-                            // Important: You must return true explicitly to tell uWebSockets the stream is still alive
-                            return true;
-                        });
+                        res.onWritable(() => { readStream.resume(); return true; });
                     }
                 });
-
                 readStream.on('error', () => {
-                   if (!contextAborted && !ctx.aborted) {
-                       res.cork(() => {
-                           res.end();
-                       });
-                   }
+                    if (!contextAborted) {
+                        res.cork(() => res.end());
+                    }
                 });
-
             });
 
             ctx.responded = true;
@@ -211,17 +191,21 @@ export class Application {
 
         // --- BRANCH B: NORMAL JSON / TEXT PAYLOAD ---
         res.cork(() => {
+            if (body === undefined && !ctx.responded) {
+                ctx.status = 404;
+            }
             this.writeHeaders(ctx);
             if (typeof body === 'object') {
                 res.writeHeader('Content-Type', 'application/json');
                 res.end(JSON.stringify(body));
-            } else if (body) {
-                 res.end(String(body));
+            } else if (body !== undefined) {
+                res.end(String(body));
             } else {
-                // Default 404 behavior if no body is set
-                res.writeStatus('404 Not Found');
-                res.writeHeader('Content-Type', 'application/json');
-                res.end(JSON.stringify({ error: "Not Found", url: ctx.url, method: ctx.method }));
+                res.end(JSON.stringify({
+                    error: "Not Found",
+                    url: ctx.url, method:
+                    ctx.method
+                }));
             }
         });
 
@@ -231,9 +215,7 @@ export class Application {
     private compose(middlewares: Middleware[]): (ctx: BaseContext) => Promise<void> {
         return function (ctx: BaseContext, next?: Next) {
             let index = -1;
-            return dispatch(0);
-
-            function dispatch(i: number): Promise<void> {
+            const dispatch = (i: number): Promise<void> => {
                 if (i <= index) return Promise.reject(new Error('next() called multiple times'));
                 index = i;
                 let fn = middlewares[i];
@@ -244,7 +226,8 @@ export class Application {
                 } catch (err) {
                     return Promise.reject(err);
                 }
-            }
+            };
+            return dispatch(0);
         }
     }
 }
