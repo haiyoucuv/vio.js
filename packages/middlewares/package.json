@@ -1,6 +1,6 @@
 {
   "name": "viojs-middlewares",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "haiyoucuv",
   "description": "Official middlewares for @vio/core framework",
   "repository": {
