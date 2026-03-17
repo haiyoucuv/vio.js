@@ -79,6 +79,9 @@ export class Router {
                                         case 'body':
                                             value = meta.name ? (bodyData ? bodyData[meta.name] : undefined) : bodyData;
                                             break;
+                                        case 'cookie':
+                                            value = meta.name ? ctx.getCookie(meta.name) : ctx.cookies;
+                                            break;
                                     }
                                     if (value !== undefined && meta.designType && meta.type !== 'ctx') {
                                         if (meta.designType === Number) value = Number(value);

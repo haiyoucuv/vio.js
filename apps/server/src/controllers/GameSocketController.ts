@@ -1,70 +1,57 @@
 import { WebSocketController, OnOpen, OnMessage, OnClose, WsContext, Application } from 'viojs-core';
-import { GameRoomService } from '../services/GameRoomService';
-import { AuthService } from '../services/AuthService';
 
-@WebSocketController('/battle')
+/**
+ * WebSocket Controller for Real-time Interaction
+ * Demonstrates high-performance WebSocket handling with built-in Pub/Sub.
+ */
+@WebSocketController('/ws/game')
 export class GameSocketController {
 
-    // Dependency Injection works seamlessly for WebSockets as well!
-    constructor(
-        private readonly roomService: GameRoomService,
-        private readonly authService: AuthService,
-        private readonly app: Application
-    ) {}
+    constructor(private readonly app: Application) {}
 
     @OnOpen()
-    async onPlayerJoin(ws: WsContext) {
-        const token = ws.query.token;
-        const roomId = ws.query.roomId || 'lobby';
-
-        // Fake auth
-        if (!token) {
-            ws.close(4001, "Permission Denied: Missing Token");
-            return;
-        }
-
-        // Bind data safely to C++ socket context
-        ws.data.userId = `User_${Math.random().toString(36).substr(2, 5)}`;
+    async onOpen(ws: WsContext) {
+        const roomId = ws.query.roomId || 'default_room';
+        
+        // Custom user data can be attached to the context
+        ws.data.userId = `Player_${Math.floor(Math.random() * 1000)}`;
         ws.data.roomId = roomId;
 
-        console.log(`[Battle Controller] ${ws.data.userId} connected. IP: ${ws.getRemoteAddressAsText()}`);
-
-        // Subscribe socket natively in C++ topic matching the room ID
+        // Join a room (Pub/Sub)
         ws.subscribe(roomId);
 
-        // Join room and start frame logic
-        this.roomService.startRoom(roomId);
-        this.roomService.joinPlayer(roomId, ws.data.userId);
+        // Notify others in the room
+        this.app.publish(roomId, JSON.stringify({
+            event: 'system',
+            message: `${ws.data.userId} has joined the room.`
+        }));
 
-        // Best Practice: System broadcast uses Master Application instance
-        this.app.publish(roomId, JSON.stringify({ event: 'system', msg: `${ws.data.userId} joined ${roomId}!` }));
+        console.log(`[WS] ${ws.data.userId} connected to ${roomId}`);
     }
 
     @OnMessage()
-    onPlayerAction(ws: WsContext, message: ArrayBuffer, isBinary: boolean) {
-        if (isBinary) {
-            // Drop complex binary logic in demo, assume text json
-            return;
-        }
+    async onMessage(ws: WsContext, message: any, isBinary: boolean) {
+        if (isBinary) return;
 
-        try {
-            const strMsg = Buffer.from(message).toString('utf-8');
-            const payload = JSON.parse(strMsg);
+        const text = message.toString();
+        const roomId = ws.data.roomId;
 
-            // Send action to heart beat engine
-            this.roomService.collectPlayerOp(ws.data.roomId, ws.data.userId, payload);
-        } catch (e) {
-            ws.send("Invalid Frame Data");
-        }
+        // Broadcast message to the entire room
+        this.app.publish(roomId, JSON.stringify({
+            event: 'chat',
+            sender: ws.data.userId,
+            message: text
+        }));
     }
 
     @OnClose()
-    onPlayerLeave(ws: WsContext, code: number, message: ArrayBuffer) {
-        console.log(`[Battle Controller] Player ${ws.data.userId} disconnected (Code: ${code}).`);
-        if (ws.data.roomId && ws.data.userId) {
-            this.roomService.leavePlayer(ws.data.roomId, ws.data.userId);
-            // Must use APP to publish since user WS pointer is already dead in C++ space
-            this.app.publish(ws.data.roomId, JSON.stringify({ event: 'system', msg: `${ws.data.userId} left.` }));
+    async onClose(ws: WsContext) {
+        const roomId = ws.data.roomId;
+        if (roomId) {
+            this.app.publish(roomId, JSON.stringify({
+                event: 'system',
+                message: `${ws.data.userId} left.`
+            }));
         }
     }
 }

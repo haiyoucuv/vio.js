@@ -3,15 +3,16 @@
   "version": "1.0.0",
   "description": "",
   "private": true,
-  "packageManager": "yarn@1.22.22",
+  "packageManager": "yarn@4.13.0",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "start": "turbo dev",
-    "build": "turbo build",
     "dev": "turbo dev",
+    "docs": "turbo dev --filter=apps-docs",
+    "start": "turbo start",
+    "build": "turbo build",
     "changeset": "changeset",
     "ci:version": "changeset version",
     "ci:publish": "changeset publish"

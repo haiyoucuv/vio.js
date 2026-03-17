@@ -84,12 +84,12 @@ export const PARAM_METADATA = 'PARAM_METADATA';
 
 export interface ParamDefinition {
     index: number;
-    type: 'param' | 'query' | 'body' | 'ctx';
+    type: 'param' | 'query' | 'body' | 'ctx' | 'cookie';
     name?: string;
     designType?: any;
 }
 
-function createParamDecorator(type: 'param' | 'query' | 'body' | 'ctx') {
+function createParamDecorator(type: 'param' | 'query' | 'body' | 'ctx' | 'cookie') {
     return (name?: string): ParameterDecorator => {
         return (target: Object, propertyKey: string | symbol | undefined, parameterIndex: number) => {
             if (!propertyKey) return;
@@ -113,6 +113,7 @@ function createParamDecorator(type: 'param' | 'query' | 'body' | 'ctx') {
 export const Param = createParamDecorator('param');
 export const Query = createParamDecorator('query');
 export const Body = createParamDecorator('body');
+export const Cookie = createParamDecorator('cookie');
 export const Ctx = () => createParamDecorator('ctx')();
 
 // --- WebSocket Decorators ---

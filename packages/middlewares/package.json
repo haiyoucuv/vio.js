@@ -19,7 +19,6 @@
     "compile": "tsc --noEmit",
     "dev": "tsc --watch"
   },
-  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.9.3"
   },

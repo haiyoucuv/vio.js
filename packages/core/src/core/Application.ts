@@ -86,7 +86,7 @@ export class Application {
     async listen(port: number, cb?: (token: us_listen_socket) => void) {
         this.app.any('/*', (res, req) => {
             if (req.getHeader('upgrade') === 'websocket') {
-                res.setYield(true);
+                req.setYield(true);
                 return;
             }
             const reqData = this.extractRequestData(req);

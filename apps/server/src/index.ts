@@ -1,50 +1,41 @@
+import 'reflect-metadata';
 import { Application } from 'viojs-core';
 import { UserController } from './controllers/UserController';
 import { GameSocketController } from './controllers/GameSocketController';
-import { errorMiddleware } from './middlewares';
-import { cookie, staticFiles } from 'viojs-middlewares';
-import * as path from 'path';
 
-async function main() {
-    const app = new Application();
+const app = new Application();
 
-    // Global middleware for error handling
-    app.use(errorMiddleware);
-    app.use(cookie());
+// Enhanced CORS Middleware (Supports Credentials/Cookies)
+app.use(async (ctx, next) => {
+    const origin = ctx.headers['origin'] || '*';
+    ctx.responseHeaders['Access-Control-Allow-Origin'] = origin;
+    ctx.responseHeaders['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
+    ctx.responseHeaders['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, Cookie';
+    ctx.responseHeaders['Access-Control-Allow-Credentials'] = 'true';
+    
+    if (ctx.method === 'OPTIONS') {
+        ctx.status = 204;
+        ctx.body = '';
+        return;
+    }
+    await next();
+});
 
-    // Serve static files
-    const publicDir = path.join(__dirname, 'public');
-    app.use(staticFiles(publicDir, { maxAge: 86400 }));
+// Logging Middleware
+app.use(async (ctx, next) => {
+    const start = Date.now();
+    await next();
+    console.log(`${ctx.method} ${ctx.url} - ${Date.now() - start}ms`);
+});
 
-    // Optional: Home route redirect to test page
-    app.use(async (ctx, next) => {
-        if (ctx.url === '/') {
-            ctx.redirect('/index.html');
-            return;
-        }
-        await next();
-    });
+// Register Controllers
+app.registerRoutes([
+    UserController,
+    GameSocketController
+]);
 
-    // Middleware example
-    app.use(async (ctx, next) => {
-        const start = Date.now();
-        console.log(`[${ctx.method}] ${ctx.url} - processing`);
-        await next();
-        const ms = Date.now() - start;
-        console.log(`[${ctx.method}] ${ctx.url} - ${ms}ms`);
-    });
-
-    // Register controllers
-    app.registerRoutes([UserController, GameSocketController]);
-
-    const PORT = 3001;
-    await app.listen(PORT, (token) => {
-        if (token) {
-            console.log(`Server listening on http://localhost:${PORT}`);
-        } else {
-            console.error(`Failed to listen on port ${PORT}`);
-        }
-    });
-}
-
-main().catch(console.error);
+app.listen(3001, (token) => {
+    if (token) {
+        console.log('🚀 Vio.js Server running on http://localhost:3001');
+    }
+});

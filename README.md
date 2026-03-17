@@ -4,7 +4,7 @@
 
 A high-performance backend framework built on top of [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js), offering a Koa-like middleware architecture, full TypeScript support with decorators, a pure Native Dependency Injection (DI) system, seamless WebSocket integration, and a zero-dependency DTO Validation Engine. 
 
-Designed specifically for handling massively concurrent game servers, heavy Spine file streaming, and microservices logic.
+Designed specifically for handling massively concurrent game servers, heavy static file streaming, and microservices logic.
 
 ## 🚀 Features
 

@@ -32,12 +32,10 @@ export class BaseContext {
         this.query = reqData.query;
         this.headers = reqData.headers;
 
-        // Important: Handle abort
         res.onAborted(() => {
             this.aborted = true;
         });
 
-        // Check if we expect a body based on headers
         const contentLength = this.headers['content-length'];
         const transferEncoding = this.headers['transfer-encoding'];
         const hasBody = (contentLength && parseInt(contentLength) > 0) || (transferEncoding && transferEncoding.includes('chunked'));
@@ -96,6 +94,45 @@ export class BaseContext {
             }
         }
         return this._parsedQuery;
+    }
+
+    // --- Cookie Support ---
+    private _cookies?: Record<string, string>;
+    public get cookies(): Record<string, string> {
+        if (!this._cookies) {
+            this._cookies = {};
+            const cookieHeader = this.headers['cookie'];
+            if (cookieHeader) {
+                cookieHeader.split(';').forEach(part => {
+                    const [key, value] = part.split('=');
+                    if (key && value) this._cookies![key.trim()] = decodeURIComponent(value.trim());
+                });
+            }
+        }
+        return this._cookies;
+    }
+
+    public getCookie(name: string): string | undefined {
+        return this.cookies[name];
+    }
+
+    public setCookie(name: string, value: string, options: { maxAge?: number, path?: string, httpOnly?: boolean, secure?: boolean, domain?: string, sameSite?: 'Strict' | 'Lax' | 'None' } = {}) {
+        let str = `${name}=${encodeURIComponent(value)}`;
+        if (options.maxAge) str += `; Max-Age=${options.maxAge}`;
+        if (options.path) str += `; Path=${options.path}`; else str += `; Path=/`;
+        if (options.domain) str += `; Domain=${options.domain}`;
+        if (options.httpOnly) str += `; HttpOnly`;
+        if (options.secure) str += `; Secure`;
+        if (options.sameSite) str += `; SameSite=${options.sameSite}`;
+        
+        const existing = this.responseHeaders['Set-Cookie'];
+        if (Array.isArray(existing)) {
+            existing.push(str);
+        } else if (existing) {
+            this.responseHeaders['Set-Cookie'] = [existing, str];
+        } else {
+            this.responseHeaders['Set-Cookie'] = str;
+        }
     }
 
     public throw(status: number, message?: string): never {

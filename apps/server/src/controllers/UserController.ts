@@ -1,62 +1,63 @@
-import { Controller, Get, Post, Use, BaseContext, Param, Query, Body, Ctx, IsRequired, IsString, IsInt, Min } from 'viojs-core';
-import { successMiddleware } from '../middlewares';
+import { Controller, Get, Post, Param, Query, Body, Ctx, Cookie, IsRequired, IsString, IsInt, Min, BaseContext } from 'viojs-core';
 
+/**
+ * Data Transfer Object for User Creation
+ * Demonstrates the built-in validation system.
+ */
 export class CreateUserDto {
-    @IsRequired('You must provide a username!')
+    @IsRequired('Username is required')
     @IsString('Username must be a string')
     username!: string;
 
-    @IsRequired('Age is required for signing up')
-    @IsInt('Age must be a valid integer')
-    @Min(18, 'You must be at least 18 years old')
+    @IsRequired('Age is required')
+    @IsInt('Age must be an integer')
+    @Min(18, 'Must be at least 18 years old')
     age!: number;
 
-    // Optional but strictly typed: ONLY validates if the user brings it.
-    @IsString('Nickname must be a string if you provide it')
-    nickname?: string;
-
-    // Completely unvalidated, raw data field.
-    // The framework will transparently copy whatever the client sends here.
-    extraInfo?: any;
+    @IsString('Alternative bio')
+    bio?: string;
 }
 
-@Controller('/users')
-@Use(successMiddleware)
+@Controller('/api/v1/users')
 export class UserController {
 
+    /**
+     * GET /api/v1/users/:id
+     * Demonstrates: Route Parameters, Query Parameters, and Cookie Injection
+     */
     @Get('/:id')
     async getUser(
         @Param('id') id: number,
-        @Query('role') role: string = 'guest',
-        @Ctx() ctx: BaseContext
+        @Ctx() ctx: BaseContext,
+        @Query('detail') detail: boolean = false,
+        @Cookie('last_visit') lastVisit?: string,
     ) {
-        // Here we test strong typing and automatic conversion (id should be Number now)
-        console.log(`Extracted ID (type ${typeof id}):`, id);
-
-        // Let's test reading a cookie! (Try setting it via the browser or Postman first)
-        const visitCount = ctx.getCookie('visit_count') || '0';
-        const newCount = parseInt(visitCount) + 1;
-
-        // And setting a cookie!
-        ctx.setCookie('visit_count', newCount.toString(), { maxAge: 3600, httpOnly: true });
+        // Set a cookie for next time using the built-in method
+        const now = new Date().toISOString();
+        ctx.setCookie('last_visit', now, { maxAge: 3600, httpOnly: true });
 
         return {
-            id,
-            name: `User ${id}`,
-            currentRole: role,
-            visits: newCount,
-            message: 'Check your cookies!'
+            info: "Extracted from Vio.js Context",
+            timestamp: now,
+            data: {
+                id,
+                type: typeof id, // Demonstrates automatic type conversion
+                requestedDetail: detail,
+                previousVisit: lastVisit || 'First time!'
+            }
         };
     }
 
+    /**
+     * POST /api/v1/users
+     * Demonstrates: Body parsing and Automatic DTO Validation
+     */
     @Post('/')
     async createUser(@Body() dto: CreateUserDto) {
-        console.log('@post called for createUser with valid DTO:', dto);
         return {
-            status: 'success',
-            username: dto.username,
-            age: dto.age,
-            message: 'User explicitly created and passed all validation checks!'
+            message: "User validated and created successfully",
+            echo: dto,
+            tip: "Try sending invalid data to see the error responses"
         };
     }
 }
