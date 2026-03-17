@@ -23,12 +23,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: 'yarn'
 
-      - name: Configure Registry and Install
-        run: |
-          yarn config set registry https://registry.npmjs.org/
-          yarn install --frozen-lockfile --network-timeout 300000
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Dependencies
+        run: yarn install
 
       - name: Build All
         run: yarn build
